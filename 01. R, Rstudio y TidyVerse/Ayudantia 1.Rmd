@@ -1,0 +1,227 @@
+---
+title: Ayudantia 1 - Machine Learning
+author: Nicolas Caraball
+date: 14/08/2024
+output: 
+  rmdformats::downcute:
+    default_style: 'dark'
+---
+
+```{r setup, include=FALSE}
+
+## Border-Color=4F709C
+
+## Fijemos nuestro directorio de trabajo
+
+setwd('D:/Machine Learning/Ayudantias/1')
+
+library(tidyverse)
+
+```
+
+# Introducción
+
+Bienvenid@s a la primera ayudantía de EAA3707 - Machine Learning para Negocios. 
+Mi nombre es Nicolás Caraball, soy Ingeniero Comercial y Data Scientist, titulado el año pasado. Fui 
+parte de la primera versión de este curso como alumno y de la segunda como ayudante!. Ante cualquier consulta siéntanse 
+libres de escribirme a mi correo 
+<span class='highlight'>ncaraball@uc.cl</span> o <span class='highlight'>ncaraball@arkho.io</span>
+
+La idea en esta ayudantía es que veamos un poco de Machine Learning, lenguajes
+que se utilizan para desarrollar modelos, sus librerías y algunos comandos
+básicos que utilizaremos a lo largo del semestre.
+
+# Ecosistema Machine Learning
+
+<center class="with-border">
+![](https://pbs.twimg.com/media/EU9Ht_kWkAMHne3?format=jpg&name=4096x4096)
+</center>
+
+Durante el curso utilizaremos exclusivamente 
+<span class='highlight'>R</span>. Sin embargo, es importante que 
+sepamos que en el mundo profesional es muy común que los mismos algoritmos y 
+metodologias sean implementados pero mediante <span class='highlight'>Python</span>.
+Para esto se ocupan librerías como <span class='highlight'>scikit-learn</span>,
+<span class='highlight'>numpy</span>, <span class='highlight'>pandas</span>
+y <span class='highlight'>matplotlib</span>
+
+Es fundamental que no memoricemos simplemente el workflow y los comandos que tenemos que usar
+para desarrollar un proyecto en un lenguaje en específico, ya que es muy probable que en un futuro tengan que trabajar con otro lenguaje de programación, especialmente porque Python es probablemente el lenguaje más popular para ML.
+Otro lenguaje relativamente nuevo pero que está siendo utilizado para estas aplicaciones es Julia, el cual podría volverse el estándar en un futuro
+
+# R, RMarkdown y RStudio
+
+Para descargar e instalar <span class='highlight'>R</span> debemos ingresar al siguiente [enlace](https://cran.r-project.org/) y elegir según el sistema operativo que estemos utilizando. Es importante que los usuarios de Windows descarguen la versión <span class='highlight'>Base</span> y que los usuarios de Mac descarguen la versión correcta según el procesador de su computador. (Si usan Linux ustedes pueden arreglárselas).
+
+Casi siempre que vayamos a programar es muy importante que tengamos un <span class='highlight'>IDE</span> (Integrated Development Environment) que nos va a permitir escribir en un archivo, nos mostrará errores y autocompletara lo que estemos queriendo escribir. Existen múltiples ambientes en los que podríamos querer trabajar con R, algunos son VSCode, PyCharm, Eclipse, JupyerLab, entre otros. Sin embargo, el que ocuparemos durante el curso será <span class='highlight'>RStudio</span>.
+
+RStudio es un IDE desarrollado por posit, el cual fue creado especialmente para R, es facil de setup y además lo podemos utilizar para trabajar con <span class='highlight'>RMarkdown</span>. Esto es un tipo de archivo que permite integrar codigo de R con texto que puede ser utilizado para crear PDFs, PPTs, HTMLs, entre otros. (Esta ayudantía está hecha con RMarkdown!!). Podemos instalarlo en el siguiente [enlace](https://posit.co/download/rstudio-desktop/)
+
+Lo más probable es que no vamos a tener que trabajar con Rmarkdown durante el curso, pero es muy util para realizar las tareas, ya que nos deja desplegar el output del código de forma muy elegante y simple. Si quieren aprender más pueden investigar en google y en este  [enlace](https://bookdown.org/yihui/rmarkdown/).
+
+# TidyVerse
+
+<center>
+![Librerias del paquete Tidyverse](https://uopsych-r-bootcamp-2020.netlify.app/slides/images/tidyverse_packages.png)
+</center>
+
+Como vimos en clases, <span class='highlight'>Tidyverse</span> es una colección de paquetes, con filosofía y gramática común, utilizados para la manipulación, importación, exploración y visualización de datos utilizada exhaustivamente en ciencia de datos.
+
+Cuando sea que queramos poder utilizar una librería, debemos asegurarnos que esté instalada (esto solo debe ser hecho una vez) y luego pedir que se cargue en el archivo que estamos trabajando.
+
+```{r Carga_Tidyverse, eval=FALSE}
+install.packages('tidyverse') ## Sintaxis para instalar la librería
+
+library('tidyverse')          ## Sintaxis para cargar la librería
+```
+
+<span class='highlight'>Nota:</span> Esto carga las 8 bibliotecas de tidyverse, si queremos ocupar solo alguna librería en específico podemos cargarla de igual manera. Por ejemplo, `library(ggplot2)`.
+
+## Datos
+
+<center>
+![](https://concordeeducation.com/games/wp-content/uploads/sites/3/2022/08/Pokemon-Logo.png)
+</center>
+
+Para que veamos algunas de las cosas que podemos hacer con estos paquetes utilizaremos la base de datos <span class='highlight'>Pokemon.csv</span> que esta arriba en canvas. Esta base de datos contiene el número, nombre y otras estadísticas para más de 700 pokemones.
+
+## ReadR
+
+Antes de poder hacer cualquier cosa, tenemos que tener datos. Para esto, necesitamos herramientas que nos permitan cargar diferentes bases de datos a la memoria de nuestro computador de manera sencilla.
+
+El paquete que nos ayuda con esto es <span class='highlight'>readr</span>, el cual nos permite leer múltiples tipos de archivos, mediante distintas funciones. Estas comienzan con el prefijo `read_`, como por ejemplo `read_csv` que nos permite leer archivos de texto plano separado por comas:
+
+```{r Ejemplo_Readr}
+datos = read_csv('pokemon.csv')
+```
+
+Como podemos ver, R nos reporta el tipo de dato que infiere que tiene cada columna. Tenemos 3 columnas del tipo caracter, 9 del tipo dbl (número) y finalmente 1 de tipo lgl (Booleano).
+
+<span class='highlight'>Nota:</span> Para otros tipos de datos o archivos como xslx, datos de SPSS, Stata, SAS, bases de datos relacionales o internet, existen distintos paquetes de tidyverse que podemos revisar en el siguiente [enlace](https://www.tidyverse.org/packages/#import).
+
+## Tibble
+
+Tidyverse trabaja con un tipo especial de data.frame, que se llama <span class='highlight'>Tibble</span>, los que tienen métodos y atributos especiales. Es importante que si cargamos datos mediante funciones que no son parte del tidyverse transformemos el dataframe al tipo tibble, para asegurar que todo funcione correctamente, de la siguiente forma:
+
+```{r Tibble}
+# Carguemos los datos directamente con R base
+datos_df = read.csv("pokemon.csv")
+
+# Veamos el tipo
+class(datos_df)
+```
+
+```{r Tibble-2}
+# Transformemos a tibble
+datos = as_tibble(datos_df)
+
+# Veamos el tipo ahora
+class(datos)
+```
+
+<span class='highlight'>Nota:</span> Si alguna vez no saben cómo cargar alguna fuente de datos específica sólo debemos asegurarnos de pasarlos a tibble una vez que los hayamos cargado
+
+## TidyR
+
+Como vimos en clases, tidyverse usa la filosofía que los datos deben (generalmente) estar en formato *tidy*, lo que se refiere a:
+
+1. Cada variable tiene su propia columna
+2. Cada observación tiene su propia fila
+3. Cada valor tiene su propia celda
+
+Por el momento no es necesario que lo utilicemos, pero más adelante podríamos tener que trabajar con bases de datos que no estén tan bonitas.
+
+## Dplyr
+
+Una vez tenemos nuestros datos cargados y ordenados, la siguiente tarea es poder manipular los datos. Esto se puede ver de distintas formas, crear nuevas columnas, filtrar de acuerdo a alguna regla, agrupar datos, calcular medidas, etc. Si alguno es familiar con <span class='highlight'>SQL</span> este paquete es el equivalente dentro de R.
+
+Antes de continuar, es importante que presentemos un nuevo operador llamado <span class='highlight'>pipe</span> `%>%` (el comando rápido para escribirlo es ctrl + shift + m). Los pipes sirven ya que nos permite entregar el resultado de una función como el primer argumento para la siguiente función. Esto hace que nuestro código sea más limpio y claro. Por ejemplo, digamos que queremos conseguir la defensa promedio de aquellos pokemones con más de 100 de vida, se vería de la siguiente forma:
+
+```{r Ejemplo_Pipes}
+## Sin usar pipes
+
+datos_filtrados = subset(datos, HP >= 100)
+datos_defensa = datos_filtrados$Defense
+defensa_promedio = mean(datos_defensa)
+round(defensa_promedio)
+
+## Usando Pipes
+datos %>% subset(HP >= 100) %>% .$Defense %>% mean() %>% round()
+```
+
+Dplyr nos da un conjunto de funciones que nos permite resolver muchos problemas de manipulación de datos:
+
+* <span class='highlight'>select()</span>: Seleccionar variables según el nombre
+* <span class='highlight'>mutate()</span>: Crear nuevas variables que son funciones de variables ya existentes.
+* <span class='highlight'>filter()</span>: Seleccionar observaciones basado en sus valores
+* <span class='highlight'>summarise()</span>: Reducir múltiples valores en estadisticos más simples
+* <span class='highlight'>group_by()</span>: Permite agrupar los datos luego de reducirlos
+* <span class='highlight'>arrange()</span>: Cambiar el orden de las observaciones
+
+Así, podemos ver algunos ejemplos con cada una de estas funciones
+
+```{r Ejemplo_dplyr}
+## Seleccionar
+# Queremos solo escoger 3 variables
+datos_seleccionados = datos %>%  select(Name, Type.1, Generation, HP)
+datos_seleccionados
+
+## Mutar
+# Queremos estandarizar una variable
+datos_estandarizados = datos_seleccionados %>% 
+                       mutate(HP_Estandar = (HP - mean(HP))/sd(HP))
+datos_estandarizados
+
+## Filtrar
+# Queremos solo quedarnos con observaciones que sean de la primera generacion
+datos_filtrados = datos_estandarizados %>% filter(Generation == '1')
+datos_filtrados
+
+## Resumir y agrupar
+# Consigamos el promedio de HP por tipo y el numero de observaciones
+datos_resumidos = datos_filtrados %>% group_by(Type.1) %>% 
+                                      summarise(HP_promedio = mean(HP),
+                                                n_obs = n())
+datos_resumidos
+
+## Ordenar
+# Queremos mostrar los datos de mayor a menor segun el numero de obervaciones
+datos_ordenados = datos_resumidos %>% arrange(desc(n_obs)) 
+datos_ordenados
+```
+
+## GGPlot2
+
+Esta librería nos permite realizar gráficos a partir de los datos que trabajemos. La forma en que funciona es muy intuitiva, donde los gráficos se van armando por capas, comenzando con un canvas vacío. Primero se definen la fuente de los datos y las variables que queremos utilizar, para luego agregar la visualización que queremos.
+
+Este paquete es extremadamente profundo, por lo que explicarlo todo bien en un periodo corto podría ser difícil. Si quieren seguir aprendiendo pueden leer el [capítulo dedicado a visualización](https://r4ds.had.co.nz/data-visualisation.html) del libro R for Data Science.
+
+Usando este paquete se puede crear visualizaciones como la siguiente:
+
+<center class='with-border'>
+```{R ejemplo_ggplot, echo=FALSE}
+datos_resumidos = datos %>% group_by(Type.1) %>% summarise(Defense = mean(Defense),
+                                                           Attack = mean(Attack),
+                                                           n_count = n())
+ggplot(datos_resumidos, aes(x=Defense, y=Attack)) + 
+  geom_point(aes(size=n_count, color=Type.1))     +
+  guides(size = 'none', color = guide_legend(title.position = 'top', ncol=2)) + ggtitle("Ataque vs Daño por tipo") +
+  theme_set(theme_bw())
+```
+</center>
+
+## Forcats, Stringr y Purr
+
+Por último, tenemos estas tres librerías. No vamos a  entrar mucho en detalle en ellas ya que son para tareas más específicas.
+
+En particular, `forcats` nos permite manipular variables de tipo factor, `stringr` aquellas de tipo string y `purr` herramientas de programación funcional.
+
+# TidyModels
+
+<center class='with-border'>
+![](https://analisemacro.com.br/wp-content/uploads/2023/03/Apresentacao-sem-titulo-1.png)
+</center>
+
+Como vemos en clases, <span class='highlight'>TidyModels</span> se creó para unificar las librerías de Machine Learning en R, las cuales eran dispersas y poco compatibles. Además, buscó integrar los principios que rigen al <span class='highlight'>TidyVerse</span> que vimos anteriormente.
+
+Durante el semestre profundizaremos en el funcionamiento de este paquete, aplicando los múltiples modelos que estudiaremos teóricamente.
