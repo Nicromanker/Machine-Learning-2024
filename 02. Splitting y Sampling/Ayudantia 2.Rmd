@@ -1,0 +1,372 @@
+---
+title: Ayudantia 2 - Machine Learning
+author: Nicolas Caraball
+date: 23/08/2023
+output:
+  rmdformats::downcute:
+    default_style: 'dark'
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, encoding = encoding, output_file = file.path(dirname(inputFile), 'Ayudantia 2.html')) })
+---
+
+```{r setup, include=FALSE}
+## Border-Color=4F709C
+
+## Fijemos nuestro directorio de trabajo
+
+setwd('D:/Machine Learning/Ayudantias/2')
+```
+
+# Introducción
+
+Bienvenid@s a la segunda ayudantía de EAA3707 - Machine Learning para Negocios. 
+En esta ocación vamos a ver los siguientes temas:
+
+1. ¿Para qué necesitamos dividir los datos?
+2. ¿Para qué necesitamos resamplear los datos?
+3. Discusión: En que situaciones Overfitting es bueno.
+
+## Antes de comenzar
+
+Lo primero que debemos hacer siempre es cargar las librerias que utilizaremos
+durante nuestro proyecto. En esta caso vamos a cargar dos librerias que traen cargados datos. Primero <span class='highlight'>gapminder</span> la cual contiene un extracto de las bases de datos de [GAPMINDER](https://www.gapminder.org/data/), la cual tiene datos de multiples fuentes de distintas variables de paises. Entre estas se encuentran:
+
+* Tasa de fertilidad total
+* Tasa de mortalidad infantil
+* PIB per cápita
+* Índice de Gini
+* Esperanza de Vida
+
+Por otro lado vamos a cargar <span class='highlight'>tseries</span> la que nos permite descargar el valor de acciones de distintas empresas, siendo capaces de especificar la informacion que queremos (precio de inicio, precio de cierre, promedio, etc) y el intervalo de tiempo para el que lo queremos (cada dia, semana, mes).
+
+```{r library-charge, results='hide', message=FALSE, warning=FALSE}
+
+# Packetes para trabajar con datos
+library(tidyverse)
+library(tidymodels)
+
+# Packetes con bases de datos
+library(gapminder)
+library(tseries)
+
+# Seteamos un seed para poder reproducir resultados
+set.seed(31415)
+```
+
+# ¿Para qué necesitamos dividir los datos?
+
+<center class="with-border">
+![Proceso de separación de datos](https://miro.medium.com/v2/resize:fit:1838/1*pJ5jQHPfHDyuJa4-7LR11Q.png)
+</center>
+
+En Machine Learning el analisis y modelamiento de los datos no terminar cuando ajustamos el modelo. Todo analisis tiene algún proposito, algo que queremos cumplir. Pero, ¿Como sabemos que tan bien lo hicimos?
+
+Dentro de estos propositos hay dos en los que nos vamos a centar.
+
+1. Predecir: Queremos poder predecir con precisión el comportamiento de una observación futura, como por ejemplo la probabilidad de no pago de un cliente, la probabilidad de deserción laboral, etc.
+2. Relacionar: Queremos describir / formar relaciones entre los datos, por ejemplo, segmentos de clientes, recomendar videos, productos cocomprados, etc.
+
+Para cumplir estos dos propositos existen muchos modelos distintos que podemos utilizar, los cuales dependiendo del tipo de variables que tenemos y las relaciones entre estas pueden ser mejores o peores. Por esta razón nos interesa buscar formas de poder comparar modelos y asi elegir el que mejor lo haga.
+
+Ademas, no solamente existen muchos modelos, si no que estos pueden contar con muchos hiperparametros que cambian las caracteristicas y comportamiento del modelo. Por ejemplo, si queremos ajustar un modelo de regresión múltiple polinomial debemos elegir el grado que éste tendrá. En un modelo de K-Medias debemos elegir el numero de segmentos, etc.
+
+## ¿Cuál es el problema entonces?
+
+Muchos modelos se ajustan tratando de optimizar una funcion objetivo utilizando algun criterio de precisión, como puede ser el <span class='highlight'>RMSE</span> (Raiz Error Cuadratico Medio). En este caso, ¿hace sentido utilizar los mismos datos con los que entrenamos el modelo para medir que tan bueno es?
+
+## ¿Cómo arreglamos esto?
+
+Existen dos formas de poder solucionar este problema, una muy costosa pero mejor, y una practica pero levemente inferior:
+
+1. Ajustar el modelo y esperar a conseguir más datos (por ejemplo seguir entregando creditos) y luego ver que tan bueno es el modelo en predecir. Esto puede ser muy costoso, tardar mucho tiempo y riesgoso, como con el caso de un estudio de una enfermedad.
+2. Perder una parte de los datos totales que tenemos, y utilizar estos para ver que tan bueno es el modelo. Perdemos datos al momento de entrenar el modelo, pero tenemos la capacidad de evaluar el poder predictivo del modelo de forma más cercana a la realidad.
+
+Basicamente todos los proyectos de Machine Learning parte con este proceso, separando los datos en una base de <span class='highlight'>entrenamiento</span> y una de <span class='highlight'>test</span>. La primera se ocupa para ajusta el modelo y la segunda para evaluar.
+
+# Ejemplo Train - Test Spliting
+
+Veamos un ejemplo utilizando la libreria <span class='highlight'>gapminder</span>. Supongamos que nos interesa estudiar la relación entre la esperanza de vida y el PIB de Chile. Primero que nada carguemos los datos y hagamos un grafico para explorar los datos.
+
+```{r Load Economic Data}
+# Los datos están en el tibble gapminder
+datosChile = gapminder %>% filter(country == "Chile")
+
+# Veamos como se ven nuestros datos
+head(datosChile)
+
+# Creamos el grafico
+ggplot(data = datosChile,
+       aes(x = gdpPercap, y = lifeExp)) +
+       geom_point(size = 6, color = '#4F709C') + 
+       labs(x = 'PIB per cápita', y = 'Esperanza de vida',
+            title = 'Relación esperanza de vida y PIB per cápita',
+            subtitle = 'Datos temporales de Chile')
+```
+
+Como podemos ver, pareciera que la relación entre estas dos variables no es lineal, por lo que podria ser mejor un modelo cuadratico / polinomial. Para ver el efecto de usar la misma base para entrenar y testear podemos ver en primer lugar como se ajusta el modelo segun el grado del polinomio:
+
+```{r Graph Poly Models}
+ggplot(data = datosChile,
+       mapping = aes(x = gdpPercap, y = lifeExp)) +
+  geom_point(size = 6) +
+  stat_smooth(method = 'lm', se = FALSE, col = 'tomato',
+              formula = y ~ x) +
+  stat_smooth(method = 'lm', se = FALSE, col = '#4F709C',
+              formula = y ~ poly(x, 2, raw = TRUE)) +
+  stat_smooth(method = 'lm', se = FALSE, col = 'green',
+              formula = y ~ poly(x, 5, raw = TRUE)) +
+  stat_smooth(method = 'lm', se = FALSE, col = 'orange',
+              formula = y ~ poly(x, 7, raw = TRUE)) +
+  labs(x = 'PIB per cápita', y = 'Esperanza de vida',
+       title = 'Ajustes esperanza de vida vs PIB per cápita',
+       subtitle = 'Datos temporales de Chile')
+```
+
+Como podemos ver, mientras mayor el grado del polinomio, el modelo se asemeja cada vez más a los datos. Esto es lo que se denomina un problema de <span class='highlight'>overfitting</span>. En este caso estamos haciendo que el modelo no solo explique la variabilidad real de la asociación si no que tambien el ruido inherente.
+
+Para comparar numericamente los modelos, estimemoslos y veamos como se comporta el RMSE segun el grado del polinomio.
+
+```{r Evolution RMSE Poly Grade}
+
+# Definimos el vector donde vamos a guardar los RMSE y el grado del polinomio
+vectorRMSE = c()
+vectorGrado = c()
+
+for (i in 1:7) {
+  # Ajustamos el modelo de regresion lineal del grado i
+  lm = lm(lifeExp ~ poly(gdpPercap, i), datosChile)
+  
+  # Obtenemos su RMSE
+  RMSE = mean(sqrt(lm$residuals^2))
+  
+  # Agregamos los valores a los vectores
+  vectorRMSE = append(vectorRMSE, RMSE)
+  vectorGrado = append(vectorGrado, i)
+}
+
+# Guardemos los resultados en un tibble
+tibbleRMSE = tibble(grado_pol = vectorGrado,
+                   RMSE = vectorRMSE)
+
+ggplot(tibbleRMSE, aes(x = grado_pol, y = RMSE)) + 
+        geom_line(color = "#4F709C",
+                  lwd = 1.5) +
+        geom_point(color = "#9c744f",
+                  size = 4) +
+        labs(x = "Grado Polinomio",
+            title = "Evolucion RMSE segun grado polinomio")
+```
+
+Podriamos pensar, Bacan! Nuestro modelo claramente es mejor, ya que el RMSE disminuye... pero, ¿Es verdaderamente asi?
+
+Pongamoslo a la prueba, hagamos un split de datos, consiguiendo una base de entrenamiento y otra de test. Para esto ocuparemos la libreria <span class='highlight'>rsample</span> que ya viene dentro de <span class='highlight'>TidyModels</span>. Vamos a utilizar las siguientes tres funciones:
+
+1. initial_split(): Hace la separación como tal de los datos, teniendo los datos de entrenamiento y de testeo dentro suyo
+2. training(): Esta funcion toma como argumento un objeto del tipo 'initial_split' que agradablemente es lo que retorna la funcion anterior, y retorna un tibble con los datos de entremaiento.
+3. test(): Igual a training solo que los datos de testeo.
+
+Una vez que hayamos hecho el split, haremos lo mismo solo que calcularemos el ECM usando la base de testeo.
+
+<span class='highlight'>Nota:</span> Siempre que vayan a trabajar con un paquete puede ser util que vean la documentacion / pagina de este. (La mayoria de las librerias lo tienen). En este caso, la pagina es [esta](https://rsample.tidymodels.org/index.html).
+
+```{r Evolution of RMSE with Data Split}
+
+# Hacemos la separación de los datos
+initialSplit = initial_split(datosChile)
+initialSplit
+
+# Extraigamos los datos
+datosTrain = training(initialSplit)
+datosTest = testing(initialSplit)
+
+# Definimos el vector donde vamos a guardar los RMSE
+vectorRMSETest = c()
+
+for (i in 1:7) {
+  # Ajustamos el modelo de regresión lineal de grado i
+  lm = lm(lifeExp ~ poly(gdpPercap, i), datosTrain)
+  
+  # Veamos el RMSE
+  prediccion = predict(lm, datosTest)
+  RMSE = mean(sqrt((datosTest$lifeExp - prediccion)^2))
+  
+  # Guardemoslo en el vector
+  vectorRMSETest = append(vectorRMSETest, RMSE)
+}
+
+# Agreguemoslo a nuestro tibble anterior
+tibbleRMSE = mutate(tibbleRMSE, RMSETest = vectorRMSETest)
+
+# Grafiquemos ambos RMSE en un mismo grafico
+ggplot(tibbleRMSE, aes(x=grado_pol)) +
+  geom_line(aes(y = RMSE), col = "turquoise", lwd = 0.8) +
+  geom_point(aes(y = RMSE)) +
+  geom_line(aes(y = RMSETest), col = "salmon", lwd = 0.8) +
+  geom_point(aes(y = RMSETest)) +
+  scale_y_log10() +
+  labs(x = 'Grado de polinomio',
+       title = 'Evolución del RMSE según el grado del polinomio')
+```
+
+El no estar separando los datos en un set de entrenamiento y uno de testeo estaba haciendo que hicieramos un modelo pesimo! Es importante asegurarnos que nuestro modelo sea bueno en la vida real. En este caso pareciera que la mejor prediccion lo da un modelo de menor grado polinomial.
+
+# ¿Por qué necesitamos resamplear los datos?
+
+La idea basica de hacer resampling a los datos de entrenamiento se basa en tratar de conseguir mejores estimadores / hiperparametros. En particular, nos interesan metodos que nos permitan obtener métricas que sean buenos estimadores del valor que se obtendira al obtener nuevos datos. 
+
+Tambien esto se puede pensar de la siguiente forma, dado que los datos con los que trabajamos deberian ser representativos, el tomar estas muestras nos permite ver como se comportaran con nuevos datos y asi conseguir por ejemplo intervalos de confianza para los estimadores, errores, etc.
+
+Lo anterior se conoce como métodos de <span class='highlight'>resampling</span>, los cuales son aplicados a la <span class='highlight'>base de entrenamiento</span>, para asi poder elegir el modelo óptimo que finalmente será puesto a prueba con la base de test. Entre los métodos que vimos en clases se encuentran:"
+
+1. K-Fold Cross-Validation
+2. Leave-one-out Cross-Validation: K-Fold donde K=n.
+3. Monte Carlo Cross-Validation
+4. Bootstrap
+
+Comunmente los más utilizado con K-Fold y Bootstrap. Donde K-Fold tiende a tener menos sesgo y más varianza, mientras que Bootstrap tiende a tenes más sesgo pero menos varianza. ¿Cuál preferimos?.
+
+# Ejemplo Resampling.
+
+Para ver un ejemplo de la aplicación de métodos de remuestreo, utilizaremos informacion del precio de acciones de tres compañias chilenas: BCI, Banco de Chile y Banco Santander. Para esto vamos a utilizar la libreria tseries para conseguir los precios de cierre ajustados mensuales de estas tres empresas desde el 2008 al dia de hoy.
+
+```{r Load Bank Data, message=FALSE, results=FALSE}
+
+# Definimos nuestras empresas de interes
+empresas = c("BCI.SN", "BCH", "BSAC")
+
+for (i in 1:length(empresas)) {
+  infoBanco = get.hist.quote(instrument = empresas[i],
+                             start = '2008-02-01',
+                             quote = 'AdjClose',
+                             compression = 'm') %>% as_tibble()
+  if (i == 1) {
+    datosBancos = tibble(infoBanco)
+  }
+  else {
+    datosBancos = cbind(datosBancos, infoBanco)
+  }
+}
+
+names(datosBancos) = c("BCI", "BancoChile", "Santander")
+```
+
+```{r Show Bank Data}
+head(datosBancos)
+```
+
+Ahora que ya tenemos los datos cargados, podemos ver en un grafico como se comportan por ejemplo de manera conjunta el precio del banco BCI y el Banco de Chile a través del tiempo:
+
+```{r Plot Bank Relation, echo=FALSE}
+ggplot(datosBancos, aes(x = BCI, y = BancoChile)) +
+       geom_point(size = 3, col = '#4F709C', alpha = 0.6) +
+       labs(x = 'Precio ajustado BCI',
+            y = 'Precio ajustado Banco de Chile',
+            title = 'Relación precio BCI y Banco de Chile')
+```
+
+Pareciera que existe una relación positiva entre los precios de las acciones de estas empresas, lo que hace sentido.
+
+Supongamos que queremos ajustar un modelo de regresión LASSO. Este modelo es similar a una regresión lineal normal, aunque le agrega un factor de penalización $\lambda$. Recordemos, el modelo de regresion simple trata de minimizar la suma de errores cuadrados (MSE), esto es:
+
+$$
+\sum_{i=1}^n (y_i - \beta_0 - \beta_1 x_{1, i})^2
+$$
+Ahora, el modelo LASSO desea encontrar valores de los $\beta$ que minimicen:
+$$
+\sum_{i=1}^n (y_i - \beta_0 - \beta_1 x_{1, i})^2 + \lambda \sum_{j=0}^1 |\beta_j|
+$$
+
+Esto lo que hace es que el modelo trate de conseguir valores de beta que no sean muy grandes, y divertidamente, logra hacer el proceso de seleccion de variables por si mismo (y no tiene problemas con variables colineales!!)
+
+Aqui tenemos un modelo con un hiperparametro, lambda no es un parametro que el modelo en si estime, si no que debemos darle un valor antes de ajustar nuestro modelo. Más adelante vamos a ver bien como hacemos para elegir hiperparametros optimos, asi que confien en el codigo que viene.
+
+Vamos a generar un intervalo de confianza para el error de estimacion segun el parametro $\lambda$. Primero vamos a trabajar con K-Folds con K = 10.
+```{R Fit-K-Folds-Lasso, message = F, warning = F}
+# Separamos los datos
+splitPrecios = initial_split(datosBancos)
+bancosTrain = training(splitPrecios)
+bancosTest = testing(splitPrecios)
+
+# Generamos los folds
+bancosFolds = vfold_cv(bancosTrain)
+
+# Generamos la receta
+bancosRecipe = recipe(BCI ~ ., data = bancosTrain) %>% 
+               step_zv(all_numeric(), -all_outcomes()) %>% 
+               step_normalize(all_numeric(), -all_outcomes())
+
+# Generamos el modelo
+bancosModel = linear_reg(penalty = tune(), mixture = 1) %>% 
+              set_engine('glmnet')
+
+# Generamos la grilla de valores para lambda
+gridLambda = grid_regular(penalty(range = c(-1, 5)),
+                          levels = 50)
+
+# Agregamos receta. (No agregamos el modelo)
+workflowBancos = workflow() %>% 
+                 add_recipe(bancosRecipe) %>% 
+                 add_model(bancosModel)
+  
+
+lambdaGrid = tune_grid(workflowBancos,
+                       resamples = bancosFolds,
+                       grid = gridLambda)
+
+lambdaGrid %>% collect_metrics()
+```
+
+Ahora que ajustamos el modelo podemos ver la evolucion del RMSE en el siguiente grafico.
+
+
+```{R Graph K-folds RMSE, echo = FALSE}
+
+lambdaGrid %>% 
+  collect_metrics() %>% 
+  filter(.metric == 'rmse') %>% 
+  ggplot(aes(x = penalty, y = mean, color = .metric)) +
+  geom_errorbar(aes(
+    ymin = mean - (1.96 * std_err / sqrt(10)),
+    ymax = mean + (1.96 * std_err / sqrt(10))
+  ), alpha = 0.5) +
+  geom_line(linewidth = 1.2, color = "turquoise") +
+  scale_y_log10() +
+  scale_x_log10() +
+  theme(legend.position = "none")
+```
+
+Hagamos lo mismo pero cambiando el metodo de resampling a bootstrap
+
+```{r Fit Bootstrap Lasso, warning=FALSE, message=FALSE}
+
+# Generamos el resample
+bancoBootstrap = bootstraps(bancosTrain)
+
+# Tuneamos con grid
+lambdaGrid = tune_grid(workflowBancos,
+                        resamples = bancoBootstrap,
+                        grid = gridLambda)
+
+lambdaGrid %>% collect_metrics()
+
+```
+
+Ahora si graficamos el RMSE promedio segun el penalty vamosa  ver lo siguiente:
+
+```{R}
+lambdaGrid %>% 
+  collect_metrics() %>% 
+  filter(.metric == 'rmse') %>% 
+  ggplot(aes(x = penalty, y = mean, color = .metric)) +
+  geom_errorbar(aes(
+    ymin = mean - (1.96 * std_err / sqrt(10)),
+    ymax = mean + (1.96 * std_err / sqrt(10))
+  ), alpha = 0.5) +
+  geom_line(linewidth = 1.2, color = "turquoise") +
+  scale_y_log10() +
+  scale_x_log10() +
+  theme(legend.position = "none")
+```
+
+Como podemos ver, se cumple que K-Folds tiene menos sesgo pero mayor varianza, mientras que Bootstrap tiene más sesgo y menor varianza.
+
+# ¿Discusión: Cuando overfitting es bueno?
